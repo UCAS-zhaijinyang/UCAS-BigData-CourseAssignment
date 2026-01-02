@@ -1,0 +1,17 @@
+\frametitle{读取流程实现}
+\begin{block}{直接从状态机读取 (\texttt{src/network/api.rs})}
+        \small
+        \begin{verbatim}
+#[post("/read")]
+pub async fn read(app: Data<App>, req: Json<String>)
+    -> actix_web::Result<impl Responder> {
+    let key = req.0;
+    let kvs = app.key_values.read().await;
+    let value = kvs.get(&key);
+
+    let res: Result<String, Infallible> =
+        Ok(value.cloned().unwrap_or_default());
+    Ok(Json(res))
+}
+        \end{verbatim}
+    \end{block}

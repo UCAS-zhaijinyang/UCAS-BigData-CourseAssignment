@@ -1,0 +1,574 @@
+\documentclass{beamer}
+\usepackage{amsfonts,amsmath,oldgerm}
+\usetheme{sintef}
+\usepackage{xeCJK}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit,backgrounds}
+
+\newcommand{\testcolor}[1]{\colorbox{#1}{\textcolor{#1}{test}}~\texttt{#1}}
+
+\usefonttheme[onlymath]{serif}
+
+\titlebackground*{assets/background}
+
+\newcommand{\hrefcol}[2]{\textcolor{cyan}{\href{#1}{#2}}}
+
+\title{分布式键值存储系统}
+% \course{Master's Degree in Computer Science}
+\author{翟锦洋、付涛}
+% \IDnumber{1234567}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{项目概述}
+
+\begin{frame}{实现功能}
+    \begin{itemize}
+        \item 设计并实现键值数据的多机分布式数据存储，采用RPC通信协议。
+        \item 支持数据的增加、修改和删除操作
+        \item 支持记录的多副本存储
+        \item 提供读写接口/检索界面访问数据存储
+        \item 支持raft一致性协议模块，故障情况下实现保证可靠存储
+        \item 实现元数据管理
+    \end{itemize}
+\end{frame}
+
+\section{meta-server架构}
+
+\footlinecolor{sintefyellow}
+\begin{frame}{整体架构图}
+    \vspace*{0cm}
+    \begin{center}
+        \includegraphics[width=\textwidth,height=0.9\textheight,keepaspectratio]{overall.png}
+    \end{center}
+\end{frame}
+
+\begin{frame}[fragile]{整体架构}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{应用架构}
+                应用采用三层分布式架构，客户端通过代理服务器与节点服务器通信。代码组织上，使用 Python 语言实现 meta-server；使用 XML-RPC 实现客户端与服务器之间的通信；使用 Flask 实现 HTTP 测试服务器，使用 requests 库实现节点服务器与 Raft 集群的 HTTP 通信。
+            \end{block}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \fontsize{8.1pt}{9.72pt}\selectfont
+            \begin{verbatim}
+meta-server/
+|-- client.py // 客户端实现
+|-- proxy_server.py // 代理服务器
+|-- node_server.py // 节点服务器
+|-- test_flask.py // Flask测试服务器
+|-- api.md // API文档
+|-- requirements.txt // 依赖管理
+            \end{verbatim}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{系统架构概览}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{三层架构}
+                \begin{itemize}
+                    \item \textbf{客户端}：用户交互界面
+                    \item \textbf{代理服务器}：请求路由和负载分配
+                    \item \textbf{节点服务器}：业务逻辑处理
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{通信方式}
+                \begin{itemize}
+                    \item 客户端 $\leftrightarrow$ 代理服务器：XML-RPC
+                    \item 代理服务器 $\leftrightarrow$ 节点服务器：XML-RPC
+                    \item 节点服务器 $\leftrightarrow$ Raft集群：HTTP
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{组件说明}
+    \begin{block}{客户端 (client.py)}
+        \begin{itemize}
+            \item \textbf{功能}：用户交互界面
+            \item \textbf{通信方式}：XML-RPC
+            \item \textbf{主要特性}：
+                  \begin{itemize}
+                      \item 用户认证（用户名/密码）
+                      \item 客户端ID分配
+                      \item 命令解析与执行
+                  \end{itemize}
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{组件说明}
+    \begin{block}{代理服务器 (proxy\_server.py)}
+        \begin{itemize}
+            \item \textbf{功能}：请求路由和负载分配
+            \item \textbf{端口}：21000
+            \item \textbf{主要特性}：
+                  \begin{itemize}
+                      \item 用户认证管理
+                      \item 客户端ID分配与管理
+                      \item 命令转发到对应的节点服务器
+                      \item 响应格式化与错误处理
+                  \end{itemize}
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{组件说明}
+    \begin{block}{节点服务器 (node\_server.py)}
+        \begin{itemize}
+            \item \textbf{功能}：业务逻辑处理层
+            \item \textbf{端口}：20000 + server\_id
+            \item \textbf{主要特性}：
+                  \begin{itemize}
+                      \item 键值对操作（PUT、GET、DEL、LIST）
+                      \item 集群管理操作（ADD-LEARNER、CHANGE-MEMBERSHIP、METRICS）
+                      \item 操作日志记录
+                      \item HTTP请求封装
+                  \end{itemize}
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{数据操作API}
+    \begin{block}{支持的命令}
+        \begin{itemize}
+            \item \textbf{PUT}：添加或更新键值对
+            \item \textbf{GET}：读取单个键值
+            \item \textbf{DEL}：删除键值对
+            \item \textbf{LIST}：读取所有键值对
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{PUT操作}
+    \begin{block}{功能特点}
+        \begin{itemize}
+            \item \textbf{API端点}：\texttt{POST /write}
+            \item \textbf{请求格式}：\texttt{\{"Put": \{"key": "key", "value": "value"\}\}}
+            \item \textbf{响应}：\texttt{"Ok"} 或 \texttt{"Err"}
+            \item \textbf{特点}：自动区分添加和更新操作
+        \end{itemize}
+    \end{block}
+    \begin{block}{代码示例}
+        \small
+        \begin{verbatim}
+json_data = {"Put": {"key": key, "value": value}}
+response = self._http_request('/write', json_data=json_data)
+\end{verbatim}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{GET操作}
+    \begin{block}{功能特点}
+        \begin{itemize}
+            \item \textbf{API端点}：\texttt{POST /read}
+            \item \textbf{请求格式}：字符串 \texttt{"key"}
+            \item \textbf{响应格式}：\texttt{\{"Ok": "value"\}} 或 \texttt{\{"Ok": ""\}}
+            \item \textbf{特点}：支持缓存机制（可选）
+        \end{itemize}
+    \end{block}
+    \begin{block}{代码示例}
+        \small
+        \begin{verbatim}
+json_data = key
+response = self._http_request('/read', json_data=json_data, method='POST')
+\end{verbatim}
+    \end{block}
+\end{frame}
+
+\begin{frame}{DEL和LIST操作}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{DEL操作}
+                \begin{itemize}
+                    \item \textbf{API端点}：\texttt{POST /write}
+                    \item \textbf{请求格式}：\texttt{\{"Del": \{"key": "key"\}\}}
+                    \item \textbf{响应}：\texttt{"Ok"} 或 \texttt{"Err"}
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{LIST操作}
+                \begin{itemize}
+                    \item \textbf{API端点}：\texttt{GET /read-all}
+                    \item \textbf{响应格式}：\texttt{\{"Ok": [\{...\}, ...]\}}
+                    \item \textbf{特点}：返回完整数据库快照
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}{集群管理API}
+    \begin{block}{ADD-LEARNER}
+        \begin{itemize}
+            \item \textbf{功能}：添加Raft节点作为learner
+            \item \textbf{API端点}：\texttt{POST /add-learner}
+            \item \textbf{请求格式}：\texttt{[node\_id, "api\_addr"]}
+        \end{itemize}
+    \end{block}
+    \begin{block}{CHANGE-MEMBERSHIP}
+        \begin{itemize}
+            \item \textbf{功能}：改变集群成员关系
+            \item \textbf{API端点}：\texttt{POST /change-membership}
+            \item \textbf{请求格式}：\texttt{[node\_id1, node\_id2, ...]}
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{METRICS操作}
+    \begin{block}{功能}
+        查询集群状态，返回详细信息：
+        \begin{itemize}
+            \item 节点基本信息：ID、任期、状态、Leader
+            \item 投票信息、日志信息、成员配置
+            \item 心跳信息、复制信息
+        \end{itemize}
+    \end{block}
+    \begin{block}{用途}
+        集群监控和诊断
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{客户端连接流程}
+    \begin{block}{认证和连接}
+        \begin{verbatim}
+def connect(self, username, password):
+    self.port = '21000'
+    self.proxy = xmlrpclib.ServerProxy(
+        'http://localhost:' + self.port)
+    if self.proxy.authenticate(username, password):
+        self.id = self.proxy.get_id()
+        return self.id
+    return None
+\end{verbatim}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{命令处理流程}
+    \begin{block}{代理服务器命令路由}
+        \begin{verbatim}
+def function(self, client_id, clause):
+    clause = clause.lower().strip().split()
+    command = clause[0]
+    if command in ['put', 'get', 'del', ...]:
+        method_name = command
+        server_function = getattr(self, method_name)
+        return server_function(client_id, clause)
+\end{verbatim}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{PUT操作实现}
+    \begin{block}{节点服务器PUT方法}
+        \small
+        \begin{verbatim}
+def put(self, key, value):
+    existing_value = self.get(key)
+    json_data = {"Put": {"key": key, "value": value}}
+    response = self._http_request('/write', json_data=json_data)
+    if response == "Ok":
+        self.write_log(f"添加key：{key}，value：{value}")
+        return True
+    return False
+\end{verbatim}
+    \end{block}
+\end{frame}
+
+
+\begin{frame}{Flask API测试端点}
+    \begin{block}{HTTP接口}
+        \begin{itemize}
+            \item \texttt{POST /write}：写入操作（Put/Del）
+            \item \texttt{POST /read}：读取单个键值
+            \item \texttt{GET /read-all}：读取所有键值
+            \item \texttt{POST /add-learner}：添加learner节点
+            \item \texttt{POST /change-membership}：改变成员关系
+            \item \texttt{GET /metrics}：查询集群状态
+            \item \texttt{GET /health}：健康检查
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Flask API示例}
+    \begin{block}{写入操作实现}
+        \small
+        \begin{verbatim}
+@app.route('/write', methods=['POST'])
+def write():
+    data = request.get_json()
+    if 'Put' in data:
+        put_data = data['Put']
+        key = put_data.get('key')
+        value = put_data.get('value')
+        with db_lock:
+            database[key] = value
+        return "Ok", 200
+    ...
+\end{verbatim}
+    \end{block}
+\end{frame}
+
+\footlinecolor{}
+\section{kv-store架构}
+
+\footlinecolor{sintefgreen}
+\begin{frame}[fragile]{整体架构}
+    \begin{columns}
+        \begin{column}{0.5\textwidth}
+            \begin{block}{应用架构}
+                应用采用多节点分布式架构，每个节点运行独立的 Raft 实例。代码组织上，使用 rust 语言实现 kv-store；使用 openraft 实现 raft 协议提供一致性保证；使用 actix-web 实现 http 服务器，使用 rust bTreeMap 和 RocksDB 实现存储层。
+            \end{block}
+        \end{column}
+        \begin{column}{0.5\textwidth}
+            \fontsize{8.1pt}{9.72pt}\selectfont
+            \begin{verbatim}
+kv-store/
+|-- src/
+|   |--  lib.rs // 集群实现
+|   |-- app.rs // 集群声明
+|   |-- bin/main.rs // 主入口
+|   |-- store/ // 存储层
+|   |   |-- mod.rs // 存储层实现
+|   |    -- log_store.rs // 日志存储
+|   |-- network // 网络层
+|   |   |-- mod.rs // 网络层实现
+|   |   |-- api.rs // 业务 API
+|   |   |-- management.rs // 管理 API
+|   |    -- raft.rs // raft协议实现
+|   |-- openraft_network // openraft网络层
+|-- test.sh // 测试脚本
+ -- start.sh // 启动脚本
+                \end{verbatim}
+        \end{column}
+    \end{columns}
+\end{frame}
+
+\begin{frame}[plain]
+    \vspace*{0cm}
+    \begin{center}
+        \includegraphics[width=\textwidth,height=\textheight,keepaspectratio]{architecture.png}
+    \end{center}
+\end{frame}
+
+\begin{frame}{核心组件}
+    \begin{block}{1. Raft 节点 (\texttt{src/lib.rs})}
+        \begin{itemize}
+            \item 每个节点包含一个 \texttt{openraft::Raft<TypeConfig>} 实例
+            \item 节点通过 HTTP 服务（Actix-web）暴露 RPC 和业务 API
+        \end{itemize}
+    \end{block}
+    \begin{block}{2. 存储层 (\texttt{src/store/})}
+        \begin{itemize}
+            \item \textbf{日志存储} (\texttt{RocksLogStore}): 基于 RocksDB 持久化 Raft 日志条目
+            \item \textbf{状态机存储} (\texttt{StateMachineStore}): 管理 KV 数据状态，实现日志应用到状态机
+        \end{itemize}
+    \end{block}
+    \begin{block}{3. 网络层 (\texttt{src/openraft\_network/})}
+        \begin{itemize}
+            \item 实现 \texttt{RaftNetwork} 和 \texttt{RaftNetworkFactory}，处理节点间 RPC 通信
+            \item 通过 HTTP 传输 Raft 协议消息（vote、append\_entries、install\_snapshot）
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{存储层实现}
+    \begingroup
+    \setbeamerfont{frametitle}{size=\fontsize{8pt}{10pt}\selectfont}
+    \setbeamerfont{normal text}{size=\fontsize{8pt}{10pt}\selectfont}
+    \setbeamerfont{block title}{size=\fontsize{8pt}{10pt}\selectfont}
+    \setbeamerfont{block body}{size=\fontsize{8pt}{10pt}\selectfont}
+    \setbeamerfont{itemize/enumerate body}{size=\fontsize{8pt}{10pt}\selectfont}
+    \setbeamerfont{itemize/enumerate subbody}{size=\fontsize{8pt}{10pt}\selectfont}
+    \setbeamerfont{itemize/enumerate subsubbody}{size=\fontsize{8pt}{10pt}\selectfont}
+    \setbeamerfont{tt text}{size=\fontsize{8pt}{10pt}\selectfont}
+    \begin{columns}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{ 日志存储 (RocksLogStore)}
+                \texttt{RocksLogStore} 实现 \texttt{RaftLogStorage<TypeConfig>}：
+                \begin{itemize}
+                    \item \textbf{持久化}: 使用 RocksDB \texttt{logs} column family 存储日志条目
+                    \item \textbf{元数据}: 使用 \texttt{meta} column family 存储 vote 和 last\_purged\_log\_id
+                    \item \textbf{方法}:
+                          \begin{itemize}
+                              \item \texttt{append()}: 追加日志条目并刷新 WAL
+                              \item \texttt{truncate()}: 截断冲突日志
+                              \item \texttt{purge()}: 清理已应用日志
+                              \item \texttt{get\_log\_state()}: 获取日志状态
+                          \end{itemize}
+                \end{itemize}
+            \end{block}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \begin{block}{状态机存储 (StateMachineStore)}
+                \texttt{StateMachineStore} 实现 \texttt{RaftStateMachine<TypeConfig>}：
+                \begin{itemize}
+                    \item \textbf{状态管理}: \texttt{BTreeMap<String, String>} 存储 KV 数据
+                    \item \textbf{日志应用} (\texttt{apply()}):
+                          \begin{itemize}
+                              \item 处理 \texttt{Put}/\texttt{Del} 请求，更新状态机
+                              \item 处理 \texttt{Membership} 变更
+                              \item 更新 \texttt{last\_applied\_log\_id}
+                          \end{itemize}
+                    \item \textbf{快照}:
+                          \begin{itemize}
+                              \item \texttt{build\_snapshot()}: 序列化状态机数据
+                              \item \texttt{install\_snapshot()}: 从快照恢复状态机
+                          \end{itemize}
+                \end{itemize}
+            \end{block}
+        \end{column}
+    \end{columns}
+    \endgroup
+\end{frame}
+
+\begin{frame}{网络层实现}
+    \begin{block}{Network 实现 \texttt{RaftNetwork<TypeConfig>}}
+        \begin{itemize}
+            \item \textbf{RPC 方法}:
+                  \begin{itemize}
+                      \item \texttt{vote()}: 选举投票
+                      \item \texttt{append\_entries()}: 日志复制
+                      \item \texttt{install\_snapshot()}: 快照传输
+                  \end{itemize}
+            \item \textbf{通信方式}: HTTP POST 请求，JSON 序列化
+        \end{itemize}
+    \end{block}
+    \begin{block}{Raft RPC接口}
+        \begin{itemize}
+            \item \texttt{POST /vote}：选举投票
+            \item \texttt{POST /append}：日志复制
+            \item \texttt{POST /snapshot}：快照传输
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}{API层设计 (\texttt{src/network/})}
+    \begin{block}{管理API}
+        \begin{itemize}
+            \item \texttt{POST /init}：初始化集群
+            \item \texttt{POST /add-learner}：添加learner节点
+            \item \texttt{POST /change-membership}：改变成员关系
+            \item \texttt{GET /metrics}：查询集群状态
+        \end{itemize}
+    \end{block}
+    \begin{block}{业务API}
+        \begin{itemize}
+            \item \texttt{POST /write}：KV写入操作（Put/Del）
+            \item \texttt{POST /read}：KV读取操作（单个键值）
+            \item \texttt{GET /read-all}：读取所有键值对
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{写入流程（Put/Delete）}
+    \begin{block}{流程说明}
+        \texttt{/write} API 接受 \texttt{Request} 类型的请求，支持两种操作：\texttt{Put} 用于插入或更新键值对，\texttt{Del} 用于删除指定键。\texttt{write} 的语义是修改状态机，即添加一条 \texttt{log} 日志。
+    \end{block}
+    \begin{block}{执行步骤}
+        \begin{enumerate}
+            \item 客户端调用 \texttt{/write} API
+            \item \texttt{Raft.client\_write()} 将请求追加到日志
+            \item Leader 复制日志到多数节点
+            \item 日志提交后，\texttt{apply()} 应用到状态机
+            \item 返回响应给客户端
+        \end{enumerate}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{写入流程实现}
+    \begin{block}{src/mod.rs fn apply() }
+        \small
+        \begin{verbatim}
+EntryPayload::Normal(req) => match req {
+    Request::Put { key, value } => {
+        let mut st = self.data.kvs.write().await;
+        st.insert(key, value.clone());
+        Response { value: Some(value) }
+    }
+    Request::Del { key } => {
+        let mut st = self.data.kvs.write().await;
+        st.remove(&key);
+        Response { value: Some("Ok".to_string()) }
+    }
+}
+\end{verbatim}
+    \end{block}
+\end{frame}
+
+\begin{frame}{读取流程}
+    \begin{block}{流程说明}
+        读取操作直接从状态机读取，无需经过 Raft 协议。
+    \end{block}
+    \begin{block}{执行步骤}
+        \begin{enumerate}
+            \item 客户端调用 \texttt{/read} 或 \texttt{/read-all} API
+            \item 直接从 \texttt{app.key\_values}（状态机数据）读取
+            \item 返回查询结果
+        \end{enumerate}
+    \end{block}
+\end{frame}
+
+\begin{frame}[fragile]{读取流程实现}
+    \begin{block}{直接从状态机读取 (\texttt{src/network/api.rs})}
+        \small
+        \begin{verbatim}
+#[post("/read")]
+pub async fn read(app: Data<App>, req: Json<String>) 
+    -> actix_web::Result<impl Responder> {
+    let key = req.0;
+    let kvs = app.key_values.read().await;
+    let value = kvs.get(&key);
+
+    let res: Result<String, Infallible> = 
+        Ok(value.cloned().unwrap_or_default());
+    Ok(Json(res))
+}
+        \end{verbatim}
+    \end{block}
+\end{frame}
+
+\begin{frame}{测试场景}
+    \begin{block}{\texttt{test.sh}}
+        \fontsize{9.9pt}{11.88pt}\selectfont
+        \begin{itemize}
+            \item \textbf{集群初始化}：启动 3 个未初始化的节点，初始化节点 1 为单节点集群（Leader）
+            \item \textbf{成员管理}：添加节点 2 和节点 3 为 learner，将集群从单节点 \texttt{[1]} 扩展为三节点 \texttt{[1, 2, 3]}
+            \item \textbf{数据写入}：在 Leader 节点写入键值对，验证数据已复制到所有节点
+            \item \textbf{数据读取}：从所有节点（Leader 和 Followers）读取数据，验证一致性
+            \item \textbf{数据删除}：测试删除键值对，验证删除操作在所有节点生效
+            \item \textbf{模拟故障}：杀死 Leader 节点（节点 1），验证剩余节点选举出新 Leader，在新 Leader 上继续写入和读取
+            \item \textbf{节点恢复}：重启节点 1，验证节点 1 能够从快照或日志恢复状态，验证恢复后数据一致性
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\section{总结}
+
+\begin{frame}{项目总结}
+    \begin{block}{meta-server}
+        \begin{itemize}
+            \item 实现客户端登录与节点分配
+            \item 支持完整数据操作（增删改查）接口
+            \item 实现了 raft 节点管理、集群状态监控
+        \end{itemize}
+    \end{block}
+    \begin{block}{kv-store}
+        \begin{itemize}
+            \item 基于 Openraft 保证据一致性，实现了日志与状态机同步
+            \item 使用 RocksDB 进行日志、状态机和数据快照的持久化存储
+            \item 测试了节点故障和恢复，具有容错性
+        \end{itemize}
+    \end{block}
+\end{frame}
+
+\backmatter
+\end{document}
