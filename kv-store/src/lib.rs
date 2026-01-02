@@ -1,0 +1,108 @@
+#![allow(clippy::uninlined_format_args)]
+#![deny(unused_qualifications)]
+
+// client_http 节点代表 raft 节点，openraft_network/network/store 实现的网络通信 api 会被其注册
+pub mod app; // 集群
+pub mod network; // 集群对外 web api 实现
+pub mod openraft_network; // raft 协议通信网络实现
+pub mod store; // log 和状态机存储；存储相关网络通信实现
+pub mod typ;
+
+use std::path::Path;
+use std::sync::Arc;
+
+use actix_web::HttpServer;
+use actix_web::middleware;
+use actix_web::middleware::Logger;
+use actix_web::web::Data;
+use openraft::Config;
+
+use crate::app::App;
+use crate::network::api;
+use crate::network::management;
+use crate::network::raft;
+use crate::store::Request;
+use crate::store::Response;
+use crate::store::new_storage;
+
+pub type NodeId = u64;
+
+openraft::declare_raft_types!(
+    pub TypeConfig:
+        D = Request,
+        R = Response,
+);
+
+pub type LogStore = store::log_store::RocksLogStore<TypeConfig>;
+pub type StateMachineStore = store::StateMachineStore;
+pub type Raft = openraft::Raft<TypeConfig>;
+
+pub async fn start_raft_node<P>(
+  node_id: NodeId,
+  dir: P,
+  addr: String,
+) -> std::io::Result<()>
+where
+  P: AsRef<Path>,
+{
+  // 该 raft 节点的配置
+  let config = Config {
+    heartbeat_interval: 250,
+    election_timeout_min: 299,
+    ..Default::default()
+  };
+
+  let config = Arc::new(config.validate().unwrap());
+
+  let (log_store, state_machine_store) = new_storage(&dir).await;
+
+  let kvs = state_machine_store.data.kvs.clone();
+
+  // openraft network
+  let network = openraft_network::NetworkFactory {};
+
+  // 创建 Raft 节点
+  let raft = openraft::Raft::new(
+    node_id,
+    config.clone(),
+    network,
+    log_store,
+    state_machine_store,
+  )
+  .await
+  .unwrap();
+
+  let app_data = Data::new(App {
+    id: node_id,
+    addr: addr.clone(),
+    raft,
+    key_values: kvs,
+    config,
+  });
+
+  // 启动 actix-web server, 提供 raft 服务
+  let server = HttpServer::new(move || {
+    actix_web::App::new()
+      .wrap(Logger::default())
+      .wrap(Logger::new("%a %{User-Agent}i"))
+      .wrap(middleware::Compress::default())
+      .app_data(app_data.clone())
+      // raft internal RPC 通信
+      .service(raft::append)
+      .service(raft::snapshot)
+      .service(raft::vote)
+      // admin API
+      .service(management::init)
+      .service(management::add_learner)
+      .service(management::change_membership)
+      .service(management::metrics)
+      // application API
+      .service(api::write)
+      .service(api::read)
+      .service(api::read_all)
+  });
+
+  let x = server.bind(addr)?;
+
+  x.run().await
+}
