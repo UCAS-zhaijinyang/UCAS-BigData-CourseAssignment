@@ -1637,10 +1637,11 @@ dependencies = [
  "futures",
  "maplit",
  "openraft-macros",
+ "openraft-rt",
+ "openraft-rt-tokio",
  "rand 0.9.2",
  "serde",
  "thiserror",
- "tokio",
  "tracing",
  "tracing-futures",
  "validit",
@@ -1655,6 +1656,25 @@ dependencies = [
  "quote",
  "semver",
  "syn 2.0.111",
+]
+
+[[package]]
+name = "openraft-rt"
+version = "0.10.0"
+dependencies = [
+ "futures",
+ "openraft-macros",
+ "rand 0.9.2",
+]
+
+[[package]]
+name = "openraft-rt-tokio"
+version = "0.10.0"
+dependencies = [
+ "futures",
+ "openraft-rt",
+ "rand 0.9.2",
+ "tokio",
 ]
 
 [[package]]
@@ -2566,7 +2586,6 @@ dependencies = [
  "signal-hook-registry",
  "socket2 0.6.1",
  "tokio-macros",
- "tracing",
  "windows-sys 0.61.2",
 ]
 
@@ -2839,9 +2858,9 @@ dependencies = [
 
 [[package]]
 name = "validit"
-version = "0.2.4"
+version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1fad49f3eae9c160c06b4d49700a99e75817f127cf856e494b56d5e23170020"
+checksum = "4efba0434d5a0a62d4f22070b44ce055dc18cb64d4fa98276aa523dadfaba0e7"
 dependencies = [
  "anyerror",
 ]
