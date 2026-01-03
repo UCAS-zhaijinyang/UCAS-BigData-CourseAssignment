@@ -1,7 +1,5 @@
 # UCAS [大数据技术](https://jwcg.ucas.ac.cn/public/courseOutlines?courseId=294920)大作业 2025 fall
 
-
-
 本项目是一个基于 Raft 共识算法的分布式键值存储系统，包含两个组件：`kv-store`（Rust 实现的 Raft 集群）和 `meta-server`（Python 实现的元数据服务器和客户端）。
 
 ## 项目代码结构
@@ -79,7 +77,6 @@ chmod +x start.sh
 
 #### 2. 启动 meta-server 系统
 
-
 ```bash
 cd meta-server
 pip install -r requirements.txt
@@ -88,7 +85,6 @@ pip install -r requirements.txt
 #节点服务器会启动在端口 20000、20001、20002（对应 3 个服务器）。
 python3 node_server.py
 # 输入: 3
-
 
 # 新建终端
 # 运行代理服务器，输入客户端数量（例如：3）
