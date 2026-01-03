@@ -1,0 +1,5 @@
+target
+*.db
+*.log
+
+__pycache__/

@@ -15,7 +15,6 @@ pub type SnapshotData = <TypeConfig as openraft::RaftTypeConfig>::SnapshotData;
 
 pub type RaftMetrics = openraft::RaftMetrics<TypeConfig>;
 
-pub type Vote = openraft::Vote<TypeConfig>;
 pub type VoteRequest = openraft::raft::VoteRequest<TypeConfig>;
 pub type AppendEntriesRequest = openraft::raft::AppendEntriesRequest<TypeConfig>;
 pub type InstallSnapshotRequest = openraft::raft::InstallSnapshotRequest<TypeConfig>;

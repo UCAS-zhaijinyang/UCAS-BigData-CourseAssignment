@@ -100,4 +100,22 @@ rpc 21001/init '[]'
 
 echo "Server 1 is a leader now"
 
+echo "向 leader 写入数据"
+sleep 1
+echo
+rpc 21001/write '{"Put":{"key":"foo","value":"bar"}}'
+sleep 1
+echo "Data written"
+sleep 1
+
+echo "从 node 1 读取数据"
+echo
+rpc 21001/read  '"foo"'
+sleep 1
+
+echo "从 node 1 删除数据"
+echo
+rpc 21001/write '{"Del":{"key":"foo"}}'
+sleep 1
+
 tail -f n1.log
