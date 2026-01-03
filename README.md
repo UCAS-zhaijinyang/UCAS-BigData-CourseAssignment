@@ -99,10 +99,6 @@ meta-server/
   - 用于测试 meta-server 功能
   - 运行在端口 21001
 
-### 3. UCAS_beamer/ - 演示文稿
-
-LaTeX Beamer 演示文稿相关文件（项目文档/报告）。
-
 ## 项目使用方法
 
 ### 前置要求

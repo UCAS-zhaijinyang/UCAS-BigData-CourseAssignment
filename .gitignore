@@ -3,3 +3,30 @@ target
 *.log
 
 __pycache__/
+
+# LaTeX
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+*.idx
+*.ilg
+*.ind
+*.dpth
+*.md5
+*.auxlock
+build/
+out/
+_cache/
