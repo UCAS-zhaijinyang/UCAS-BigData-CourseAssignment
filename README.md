@@ -53,6 +53,12 @@ meta-server/
 
 ## 项目使用方法
 
+### 环境说明
+
+- python 3.9
+- rust 1.91
+- vscode(/.vscode 下的配置为 latex 编译所必要的)
+
 ### 使用步骤
 
 #### 1. 启动 kv-store Raft 集群
@@ -142,4 +148,5 @@ python3 test_flask.py
 - **meta-server**: Python, XML-RPC, Flask, Requests
 
 [openraft](https://github.com/databendlabs/openraft)
+
 [csdn](https://blog.csdn.net/m0_60947585/article/details/135314293)
