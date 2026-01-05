@@ -30,3 +30,6 @@ __pycache__/
 build/
 out/
 _cache/
+
+# macOS
+.DS_Store
