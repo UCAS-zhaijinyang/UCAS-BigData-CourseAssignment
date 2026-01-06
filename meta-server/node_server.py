@@ -1,8 +1,8 @@
-import threading
 import json
+import threading
+from xmlrpc.server import SimpleXMLRPCRequestHandler, SimpleXMLRPCServer
+
 import requests
-from xmlrpc.server import SimpleXMLRPCServer
-from xmlrpc.server import SimpleXMLRPCRequestHandler
 
 # 服务器日志
 log = []
